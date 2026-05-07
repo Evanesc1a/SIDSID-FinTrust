@@ -1,0 +1,12 @@
+{
+  "precision": 0.625,
+  "recall": 1.0,
+  "f1_score": 0.7692307692307693,
+  "fpr": 0.15,
+  "tp": 200,
+  "fp": 120,
+  "tn": 680,
+  "fn": 0,
+  "n_train": 800,
+  "contamination": 0.15
+}
