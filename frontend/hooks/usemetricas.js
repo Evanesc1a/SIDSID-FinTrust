@@ -7,6 +7,7 @@ export function useMetricas(intervalo = 0) {
   const [error, setError] = useState(null)
 
   const cargar = useCallback(async () => {
+    setLoading(true)
     try {
       const res = await metricasService.obtener()
       setMetricas(res.data)

@@ -2,8 +2,13 @@
 Script para simular sesiones de prueba y ver la detección en tiempo real.
 Ejecutar con: python pruebas_sesiones.py
 """
+import sys
+import io
 import requests
 import json
+
+# Evitar UnicodeEncodeError en consolas Windows (cp1252)
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 BASE = "http://localhost:5000/api"
 
@@ -29,7 +34,7 @@ print("=" * 55)
 
 sesiones = [
     {
-        "nombre": "✅ Acceso NORMAL",
+        "nombre": "[OK] Acceso NORMAL",
         "datos": {
             "usuario_id": uid,
             "dispositivo_id": "iPhone-14",       # dispositivo conocido
@@ -41,7 +46,7 @@ sesiones = [
         }
     },
     {
-        "nombre": "⚠️  Riesgo MEDIO — IP nueva",
+        "nombre": "[AVISO] Riesgo MEDIO - IP nueva",
         "datos": {
             "usuario_id": uid,
             "dispositivo_id": "iPhone-14",
@@ -53,7 +58,7 @@ sesiones = [
         }
     },
     {
-        "nombre": "🔴 Riesgo ALTO — dispositivo + IP nuevos",
+        "nombre": "[ALTO] Riesgo ALTO - dispositivo + IP nuevos",
         "datos": {
             "usuario_id": uid,
             "dispositivo_id": "Android-Desconocido",  # dispositivo nuevo
@@ -65,7 +70,7 @@ sesiones = [
         }
     },
     {
-        "nombre": "🚨 Riesgo CRÍTICO — todo anómalo",
+        "nombre": "[CRITICO] Riesgo CRITICO - todo anomalo",
         "datos": {
             "usuario_id": uid,
             "dispositivo_id": "Device-XYZ-Desconocido",
@@ -91,7 +96,7 @@ for s in sesiones:
     if analisis.get("factores"):
         print(f"  Factores        : {', '.join(analisis['factores'][:2])}")
     if alerta:
-        print(f"  ⚡ Alerta creada : {alerta['id'][:8]}... [{alerta['nivel_riesgo']}]")
+        print(f"  >> Alerta creada : {alerta['id'][:8]}... [{alerta['nivel_riesgo']}]")
 
 print("\n" + "=" * 55)
 print("Revisa las alertas en: http://localhost:3000/alertas")
