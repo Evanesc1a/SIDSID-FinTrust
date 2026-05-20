@@ -1,7 +1,10 @@
 """
 Rutas para métricas del sistema y KPIs del negocio.
 """
-from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+
+_utcnow = lambda: datetime.now(timezone.utc).replace(tzinfo=None)
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required
 from sqlalchemy import func
@@ -20,65 +23,62 @@ metricas_bp = Blueprint("metricas", __name__, url_prefix="/api/metricas")
 def get_metricas():
     db = SessionLocal()
     try:
-        ahora = datetime.utcnow()
+        ahora = _utcnow()
         hace_24h = ahora - timedelta(hours=24)
         hace_7d = ahora - timedelta(days=7)
 
-        # KPIs de sesiones
+        # KPIs de sesiones (2 queries)
         total_sesiones_24h = db.query(Sesion).filter(Sesion.fecha_hora >= hace_24h).count()
         sesiones_anomalas_24h = db.query(Sesion).filter(
             Sesion.fecha_hora >= hace_24h, Sesion.es_anomala == 1
         ).count()
 
-        # KPIs de alertas
+        # KPIs de alertas (3 queries escalares)
         alertas_nuevas = db.query(Alerta).filter(Alerta.estado == "NUEVA").count()
         alertas_criticas = db.query(Alerta).filter(
             Alerta.nivel_riesgo == "CRITICO", Alerta.estado == "NUEVA"
         ).count()
         alertas_7d = db.query(Alerta).filter(Alerta.fecha_creacion >= hace_7d).count()
-        
-        # Alertas resueltas (para calcular tiempo promedio de respuesta)
-        alertas_resueltas = db.query(Alerta).filter(
+
+        # Tiempo promedio de respuesta — solo columnas necesarias
+        resueltas = db.query(Alerta.fecha_creacion, Alerta.fecha_resolucion).filter(
             Alerta.estado.in_(["RESUELTA", "DESCARTADA"]),
             Alerta.fecha_resolucion.isnot(None)
         ).all()
-        
-        tiempos = []
-        for a in alertas_resueltas:
-            if a.fecha_resolucion and a.fecha_creacion:
-                diff = (a.fecha_resolucion - a.fecha_creacion).total_seconds() / 60
-                tiempos.append(diff)
+        tiempos = [
+            (r.fecha_resolucion - r.fecha_creacion).total_seconds() / 60
+            for r in resueltas
+            if r.fecha_resolucion and r.fecha_creacion
+        ]
         tiempo_promedio_respuesta = sum(tiempos) / len(tiempos) if tiempos else 0.0
 
-        # Distribución de alertas por nivel (últimos 7 días)
-        distribucion_nivel = {}
-        for nivel in ["BAJO", "MEDIO", "ALTO", "CRITICO"]:
-            distribucion_nivel[nivel] = db.query(Alerta).filter(
-                Alerta.nivel_riesgo == nivel,
-                Alerta.fecha_creacion >= hace_7d
-            ).count()
+        # Distribución por nivel — 1 query GROUP BY en lugar de 4 queries
+        dist_rows = db.query(Alerta.nivel_riesgo, func.count(Alerta.id)).filter(
+            Alerta.fecha_creacion >= hace_7d
+        ).group_by(Alerta.nivel_riesgo).all()
+        distribucion_nivel = {"BAJO": 0, "MEDIO": 0, "ALTO": 0, "CRITICO": 0}
+        for nivel, count in dist_rows:
+            if nivel in distribucion_nivel:
+                distribucion_nivel[nivel] = count
 
-        # Tendencia de sesiones anómalas (últimos 7 días, por día)
+        # Tendencia 7 días — 1 query + agrupación en Python en lugar de 7 queries
+        sesiones_anomalas_7d = db.query(Sesion.fecha_hora).filter(
+            Sesion.fecha_hora >= hace_7d,
+            Sesion.es_anomala == 1
+        ).all()
+        count_por_dia: dict = defaultdict(int)
+        for (fh,) in sesiones_anomalas_7d:
+            count_por_dia[fh.strftime("%Y-%m-%d")] += 1
+
         tendencia = []
-        for i in range(7):
-            dia_inicio = ahora - timedelta(days=i+1)
-            dia_fin = ahora - timedelta(days=i)
-            count = db.query(Sesion).filter(
-                Sesion.fecha_hora >= dia_inicio,
-                Sesion.fecha_hora < dia_fin,
-                Sesion.es_anomala == 1
-            ).count()
-            tendencia.append({
-                "fecha": dia_inicio.strftime("%Y-%m-%d"),
-                "anomalas": count,
-            })
-        tendencia.reverse()
+        for i in range(7, 0, -1):
+            dia = (ahora - timedelta(days=i)).strftime("%Y-%m-%d")
+            tendencia.append({"fecha": dia, "anomalas": count_por_dia.get(dia, 0)})
 
-        # Usuarios activos
+        # Usuarios (2 queries escalares)
         usuarios_activos = db.query(Usuario).filter_by(estado="ACTIVA").count()
         usuarios_bloqueados = db.query(Usuario).filter_by(estado="BLOQUEADA").count()
 
-        # Métricas del modelo IA
         metricas_ia = obtener_metricas_ia()
 
         return jsonify({

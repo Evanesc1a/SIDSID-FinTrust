@@ -2,7 +2,9 @@
 Rutas para registro y consulta de sesiones digitales.
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+_utcnow = lambda: datetime.now(timezone.utc).replace(tzinfo=None)
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import desc
@@ -33,7 +35,7 @@ def registrar_sesion():
         sesion = Sesion(
             id=str(uuid.uuid4()),
             usuario_id=usuario_id,
-            fecha_hora=datetime.utcnow(),
+            fecha_hora=_utcnow(),
             dispositivo_id=data.get("dispositivo_id", "unknown"),
             ubicacion=data.get("ubicacion", ""),
             ip_acceso=data.get("ip_acceso", "0.0.0.0"),
@@ -47,7 +49,7 @@ def registrar_sesion():
         sesion_data = {
             "id": sesion.id,
             "usuario_id": usuario_id,
-            "fecha_hora": sesion.fecha_hora.isoformat(),
+            "fecha_hora": sesion.fecha_hora.isoformat() if sesion.fecha_hora else None,
             "dispositivo_id": sesion.dispositivo_id,
             "ubicacion": sesion.ubicacion,
             "ip_acceso": sesion.ip_acceso,

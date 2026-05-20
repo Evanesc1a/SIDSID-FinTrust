@@ -43,7 +43,11 @@ def obtener_perfil(usuario_id):
     db = SessionLocal()
     try:
         perfil = obtener_o_crear_perfil(db, usuario_id)
+        db.commit()
         return jsonify(perfil.to_dict()), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         db.close()
 

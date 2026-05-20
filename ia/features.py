@@ -4,7 +4,9 @@ Genera las 8 features definidas en el ARC42.
 """
 import json
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+_utcnow = lambda: datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def extraer_features(sesion_data: dict, perfil: dict, sesiones_recientes: list) -> dict:
@@ -23,7 +25,7 @@ def extraer_features(sesion_data: dict, perfil: dict, sesiones_recientes: list) 
     if isinstance(fecha_hora, str):
         fecha_hora = datetime.fromisoformat(fecha_hora)
     elif fecha_hora is None:
-        fecha_hora = datetime.utcnow()
+        fecha_hora = _utcnow()
 
     # Feature 1: hora_del_dia (0-23)
     hora_del_dia = fecha_hora.hour
@@ -101,7 +103,7 @@ def calcular_factores_riesgo(features: dict) -> list:
         factores.append(f"Alta frecuencia de transacciones en sesión ({int(features['frecuencia_tx_sesion'])})")
 
     hora = features["hora_del_dia"]
-    if hora < 5 or hora > 23:
+    if hora < 5 or hora >= 23:
         factores.append(f"Acceso en horario inusual ({int(hora)}:00h)")
 
     if not factores:

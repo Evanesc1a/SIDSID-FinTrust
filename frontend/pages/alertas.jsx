@@ -54,19 +54,21 @@ export default function Alertas() {
       {/* Summary badges */}
       {resumen && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:12, marginBottom:24 }}>
-          {Object.entries(resumen.por_nivel).map(([nivel, count]) => (
-            <div key={nivel}
-              onClick={() => setNivel(prev => prev === nivel ? '' : nivel)}
+          {Object.entries(resumen.por_nivel).map(([nivelKey, count]) => (
+            <div key={nivelKey}
+              onClick={() => setNivel(prev => prev === nivelKey ? '' : nivelKey)}
               style={{
-                background:'#0d1b2e', border:`1px solid ${nivel === nivel ? '#1e3a5f' : '#1e3a5f'}`,
+                background:'#0d1b2e',
+                border:`1px solid ${nivel === nivelKey ? '#2563eb' : '#1e3a5f'}`,
                 borderRadius:10, padding:'14px 18px', cursor:'pointer',
                 display:'flex', justifyContent:'space-between', alignItems:'center',
                 transition:'all 0.15s',
+                boxShadow: nivel === nivelKey ? '0 0 0 1px #2563eb33' : 'none',
               }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#2563eb44'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = '#1e3a5f'}
+              onMouseEnter={e => { if (nivel !== nivelKey) e.currentTarget.style.borderColor = '#2563eb44' }}
+              onMouseLeave={e => { if (nivel !== nivelKey) e.currentTarget.style.borderColor = '#1e3a5f' }}
             >
-              <NivelBadge nivel={nivel} />
+              <NivelBadge nivel={nivelKey} />
               <span style={{
                 fontFamily:'Space Grotesk, sans-serif', fontSize:'1.5rem', fontWeight:700,
                 color: count > 0 ? '#e2e8f0' : '#334155',

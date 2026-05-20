@@ -3,15 +3,19 @@ Servicio para gestión de alertas de seguridad.
 """
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+
+_utcnow = lambda: datetime.now(timezone.utc).replace(tzinfo=None)
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 
 from backend.models.alerta import Alerta
 
 
 def crear_alerta(db: Session, usuario_id: str, sesion_id: str, resultado_ia: dict) -> Alerta:
-    """Crea una nueva alerta basada en el resultado del análisis de IA."""
+    """Crea una nueva alerta basada en el resultado del análisis de IA.
+    No hace commit — el llamador es responsable de confirmar la transacción.
+    """
     alerta = Alerta(
         id=str(uuid.uuid4()),
         usuario_id=usuario_id,
@@ -21,11 +25,9 @@ def crear_alerta(db: Session, usuario_id: str, sesion_id: str, resultado_ia: dic
         factores=json.dumps(resultado_ia.get("factores", [])),
         descripcion=_generar_descripcion(resultado_ia),
         estado="NUEVA",
-        fecha_creacion=datetime.utcnow(),
+        fecha_creacion=_utcnow(),
     )
     db.add(alerta)
-    db.commit()
-    db.refresh(alerta)
     return alerta
 
 
@@ -65,19 +67,19 @@ def resolver_alerta(db: Session, alerta_id: str, analista_id: str,
     alerta.estado = "RESUELTA" if accion == "RESOLVER" else "DESCARTADA"
     alerta.analista_id = analista_id
     alerta.notas_analista = notas
-    alerta.fecha_resolucion = datetime.utcnow()
+    alerta.fecha_resolucion = _utcnow()
     db.commit()
     db.refresh(alerta)
     return alerta
 
 
 def contar_alertas_por_nivel(db: Session) -> dict:
-    """Retorna conteo de alertas activas por nivel."""
-    niveles = ["BAJO", "MEDIO", "ALTO", "CRITICO"]
-    resultado = {}
-    for nivel in niveles:
-        resultado[nivel] = db.query(Alerta).filter(
-            Alerta.nivel_riesgo == nivel,
-            Alerta.estado == "NUEVA"
-        ).count()
+    """Retorna conteo de alertas activas por nivel (una sola query GROUP BY)."""
+    rows = db.query(Alerta.nivel_riesgo, func.count(Alerta.id)).filter(
+        Alerta.estado == "NUEVA"
+    ).group_by(Alerta.nivel_riesgo).all()
+    resultado = {"BAJO": 0, "MEDIO": 0, "ALTO": 0, "CRITICO": 0}
+    for nivel, count in rows:
+        if nivel in resultado:
+            resultado[nivel] = count
     return resultado

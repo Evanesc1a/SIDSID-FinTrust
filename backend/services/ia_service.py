@@ -3,7 +3,9 @@ Servicio de integración entre el backend y el módulo de IA.
 """
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+_utcnow = lambda: datetime.now(timezone.utc).replace(tzinfo=None)
 from sqlalchemy.orm import Session
 
 from backend.models.sesion import Sesion
@@ -30,7 +32,7 @@ def analizar_sesion(db: Session, usuario_id: str, sesion_data: dict) -> dict:
     perfil_dict = perfil_a_dict_para_ia(perfil_obj)
 
     # Sesiones en las últimas 24h
-    hace_24h = datetime.utcnow() - timedelta(hours=24)
+    hace_24h = _utcnow() - timedelta(hours=24)
     sesiones_recientes = db.query(Sesion).filter(
         Sesion.usuario_id == usuario_id,
         Sesion.fecha_hora >= hace_24h

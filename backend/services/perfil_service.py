@@ -2,7 +2,9 @@
 Servicio para gestión de perfiles de comportamiento de usuarios.
 """
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+_utcnow = lambda: datetime.now(timezone.utc).replace(tzinfo=None)
 from sqlalchemy.orm import Session
 
 from backend.models.perfil import PerfilComportamiento
@@ -16,8 +18,7 @@ def obtener_o_crear_perfil(db: Session, usuario_id: str) -> PerfilComportamiento
     if not perfil:
         perfil = PerfilComportamiento(usuario_id=usuario_id)
         db.add(perfil)
-        db.commit()
-        db.refresh(perfil)
+        db.flush()
     return perfil
 
 
@@ -26,7 +27,7 @@ def actualizar_perfil(db: Session, usuario_id: str) -> PerfilComportamiento:
     perfil = obtener_o_crear_perfil(db, usuario_id)
 
     # Sesiones históricas (últimas 30 días)
-    hace_30_dias = datetime.utcnow() - timedelta(days=30)
+    hace_30_dias = _utcnow() - timedelta(days=30)
     sesiones = db.query(Sesion).filter(
         Sesion.usuario_id == usuario_id,
         Sesion.fecha_hora >= hace_30_dias
@@ -70,10 +71,9 @@ def actualizar_perfil(db: Session, usuario_id: str) -> PerfilComportamiento:
     perfil.monto_promedio_tx = monto_promedio
     perfil.frecuencia_tx = frecuencia_tx
     perfil.sesiones_promedio_dia = sesiones_por_dia
-    perfil.ultima_actualizacion = datetime.utcnow()
+    perfil.ultima_actualizacion = _utcnow()
 
-    db.commit()
-    db.refresh(perfil)
+    db.flush()
     return perfil
 
 

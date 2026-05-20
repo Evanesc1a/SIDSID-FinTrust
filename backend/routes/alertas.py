@@ -24,15 +24,19 @@ def get_alertas():
     db = SessionLocal()
     try:
         alertas = listar_alertas(db, estado=estado, nivel=nivel, limite=limite, offset=offset)
-        
-        # Enriquecer con nombre de usuario
+
+        # Enriquecer con nombre de usuario — una sola query para todos los IDs
+        usuario_ids = list({a.usuario_id for a in alertas})
+        usuarios_map = {
+            u.id: u.nombre
+            for u in db.query(Usuario).filter(Usuario.id.in_(usuario_ids)).all()
+        }
         result = []
         for a in alertas:
             d = a.to_dict()
-            usuario = db.query(Usuario).filter_by(id=a.usuario_id).first()
-            d["usuario_nombre"] = usuario.nombre if usuario else "Desconocido"
+            d["usuario_nombre"] = usuarios_map.get(a.usuario_id, "Desconocido")
             result.append(d)
-        
+
         return jsonify(result), 200
     finally:
         db.close()
